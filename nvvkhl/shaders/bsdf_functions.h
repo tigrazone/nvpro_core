@@ -19,7 +19,7 @@
 
 #ifndef NVVKHL_BSDF_FUNCTIONS_H
 #define NVVKHL_BSDF_FUNCTIONS_H 1
-
+#define MICROFACET_MIN_ROUGHNESS 0.0014142f
 #include "func.h"            // cosineSampleHemisphere
 #include "ggx.h"             // brdfLambertian, ..
 #include "bsdf_structs.h"    // Bsdf*,
@@ -242,13 +242,21 @@ void brdf_ggx_smith_eval(INOUT_TYPE(BsdfEvaluateData) data, PbrMaterial mat, con
     return;
   }
 
-  // Compute BSDF and pdf.
-  data.pdf = hvd_ggx_eval(1.0f / mat.roughness, h0);
   float G1;
   float G2;
 
   float G12;
-  G12 = ggx_smith_shadow_mask(G1, G2, localK1, to_local(data.k2, mat.TBN), mat.roughness); // used localK2.z and localK1.z as localK1.z * localK1.z and abs donnt needed here
+  
+  if(mat.roughness.x < MICROFACET_MIN_ROUGHNESS && mat.roughness.x < MICROFACET_MIN_ROUGHNESS) {
+	  data.pdf = M_1_PI * 0.25f;
+	  G1 = 1.0f;
+	  G2 = 1.0f;
+	  G12 = 1.0f;
+  } else {
+	  // Compute BSDF and pdf.
+	  data.pdf = hvd_ggx_eval(1.0f / mat.roughness, h0);
+	  G12 = ggx_smith_shadow_mask(G1, G2, localK1, to_local(data.k2, mat.TBN), mat.roughness); // used localK2.z and localK1.z as localK1.z * localK1.z and abs donnt needed here
+  }
 
   data.pdf *= G1 * 0.25f / (nk1 * nh);
 
@@ -320,7 +328,19 @@ void brdf_ggx_smith_sample(INOUT_TYPE(BsdfSampleData) data, PbrMaterial mat, con
   float G1;
   float G2;
 
-  float G12 = ggx_smith_shadow_mask(G1, G2, k10, to_local(data.k2, mat.TBN), mat.roughness);
+  float G12;
+  
+  if(mat.roughness.x < MICROFACET_MIN_ROUGHNESS && mat.roughness.x < MICROFACET_MIN_ROUGHNESS) {
+	  data.pdf = M_1_PI * 0.25f;
+	  G1 = 1.0f;
+	  G2 = 1.0f;
+	  G12 = 1.0f;
+	  
+	  data.pdf *= 0.25f / (nk1 * h0.z);
+  data.event_type    = BSDF_EVENT_GLOSSY_REFLECTION;
+  } else {
+
+  G12 = ggx_smith_shadow_mask(G1, G2, k10, to_local(data.k2, mat.TBN), mat.roughness);
 
   if(G12 <= 0.0f)
   {
@@ -332,6 +352,7 @@ void brdf_ggx_smith_sample(INOUT_TYPE(BsdfSampleData) data, PbrMaterial mat, con
 
   // Compute pdf
   data.pdf = hvd_ggx_eval(1.0f / mat.roughness, h0) * G1 * 0.25f / (nk1 * h0.z);
+  }
 
   if(mat.iridescence > 0.0f)
   {
@@ -406,12 +427,21 @@ void btdf_ggx_smith_eval(INOUT_TYPE(BsdfEvaluateData) data, PbrMaterial mat, con
     fr = 0.0f;
   }
 
+  float G1;
+  float G2;
+  float G12;
+  
+  if(mat.roughness.x < MICROFACET_MIN_ROUGHNESS && mat.roughness.x < MICROFACET_MIN_ROUGHNESS) {
+	  data.pdf = M_1_PI * 0.25f;
+	  G1 = 1.0f;
+	  G2 = 1.0f;
+	  G12 = 1.0f;
+  } else {  
   // Compute BSDF and pdf
   data.pdf      = hvd_ggx_eval(1.0f / mat.roughness, h0);
 
-  float G1;
-  float G2;
-  float G12 = ggx_smith_shadow_mask(G1, G2, localK1, localK2, mat.roughness);
+  G12 = ggx_smith_shadow_mask(G1, G2, localK1, localK2, mat.roughness);
+  }
 
   if(!isThinWalled && backside)  // Refraction?
   {
@@ -498,7 +528,15 @@ void btdf_ggx_smith_sample(INOUT_TYPE(BsdfSampleData) data, PbrMaterial mat, con
 
   float G1;
   float G2;
-  float G12 = ggx_smith_shadow_mask(G1, G2, k10, to_local(data.k2, mat.TBN), mat.roughness);
+  float G12;
+  
+  if(mat.roughness.x < MICROFACET_MIN_ROUGHNESS && mat.roughness.x < MICROFACET_MIN_ROUGHNESS) {
+	  data.pdf = M_1_PI * 0.25f;
+	  G1 = 1.0f;
+	  G2 = 1.0f;
+	  G12 = 1.0f;
+  } else {  
+  G12 = ggx_smith_shadow_mask(G1, G2, k10, to_local(data.k2, mat.TBN), mat.roughness);
 
   if(G12 <= 0.0f)
   {
@@ -510,6 +548,7 @@ void btdf_ggx_smith_sample(INOUT_TYPE(BsdfSampleData) data, PbrMaterial mat, con
 
   // Compute pdf
   data.pdf = hvd_ggx_eval(1.0f / mat.roughness, h0) * G1;  // * prob;
+  }
 
   if(!isThinWalled && (data.event_type == BSDF_EVENT_GLOSSY_TRANSMISSION))  // if (refraction)
   {

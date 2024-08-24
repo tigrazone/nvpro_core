@@ -95,7 +95,7 @@ PbrMaterial evaluateMaterial(in GltfShadeMaterial material, MeshState mesh)
     roughness *= mr_sample.g;
     metallic *= mr_sample.b;
   }
-  roughness        = max(roughness, MICROFACET_MIN_ROUGHNESS);
+  //roughness        = max(roughness, MICROFACET_MIN_ROUGHNESS);
   pbrMat.roughness = vec2(roughness * roughness);  // Square roughness for the microfacet model
   pbrMat.metallic  = clamp(metallic, 0.0F, 1.0F);
 
