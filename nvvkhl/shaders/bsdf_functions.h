@@ -66,7 +66,7 @@ vec3 absorptionCoefficient(PbrMaterial mat)
 // We ad-hoc interpolate between them using the roughness.
 float fresnelCosineApproximation(float VdotN, float roughness)
 {
-  return mix(VdotN, sqrt(0.5F + 0.5F * VdotN), sqrt(roughness));
+  return mix(VdotN, sqrt(0.5F + 0.5F * VdotN), roughness);
 }
 
 // Calculate the weights of the individual lobes inside the standard PBR material.
@@ -75,7 +75,7 @@ ARRAY_TYPE(float, LOBE_COUNT, ) computeLobeWeights(PbrMaterial mat, float VdotN,
   float frCoat = 0.0F;
   if(mat.clearcoat > 0.0f)
   {
-    float frCosineClearcoat = fresnelCosineApproximation(VdotN, mat.clearcoatRoughness);
+    float frCosineClearcoat = fresnelCosineApproximation(VdotN, mat.clearcoatRoughness0);
     frCoat                  = mat.clearcoat * ior_fresnel(1.5f / mat.ior1, frCosineClearcoat);
   }
 
@@ -84,7 +84,7 @@ ARRAY_TYPE(float, LOBE_COUNT, ) computeLobeWeights(PbrMaterial mat, float VdotN,
   float frDielectric = 0;
   if(mat.specular > 0)
   {
-    float frCosineDielectric = fresnelCosineApproximation(VdotN, (mat.roughness.x + mat.roughness.y) * 0.5F);
+    float frCosineDielectric = fresnelCosineApproximation(VdotN, mat.roughness0 < 0.f ? sqrt((mat.roughness.x + mat.roughness.y) * 0.5F) : mat.roughness0);
     frDielectric             = ior_fresnel(mat.ior2 / mat.ior1, frCosineDielectric);
     frDielectric *= mat.specular;
   }

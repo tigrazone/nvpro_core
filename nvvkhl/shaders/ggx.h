@@ -31,6 +31,8 @@
 #define INOUT_TYPE(T) inout T
 #endif
 
+#define NEARzero 1e-15f
+
 float schlickFresnel(float F0, float F90, float VdotH)
 {
   return F0 + (F90 - F0) * pow(1.0F - VdotH, 5.0F);
@@ -78,10 +80,9 @@ bool isTIR(const vec2 ior, const float kh)
 float hvd_ggx_eval(const vec2 invRoughness,
                    const vec3 h)  // == vec3(dot(tangent, h), dot(bitangent, h), dot(normal, h))
 {
-  const float x     = h.x * invRoughness.x;
-  const float y     = h.y * invRoughness.y;
-  const float aniso = x * x + y * y;
-  const float f     = aniso + h.z * h.z;
+  vec3 hh     = vec3(h.xy * invRoughness, h.z);
+  
+  const float f     = dot(hh, hh);
 
   return M_1_PI * invRoughness.x * invRoughness.y * h.z / (f * f);
 }
@@ -93,7 +94,7 @@ float hvd_ggx_eval(const vec2 invRoughness,
 // vec3(dot(T, k1), dot(B, k1), dot(N, k1)).
 vec3 hvd_ggx_sample_vndf(vec3 k, vec2 roughness, vec2 xi)
 {
-  const vec3 v = normalize(vec3(k.x * roughness.x, k.y * roughness.y, k.z));
+  const vec3 v = normalize(vec3(k.xy * roughness, k.z));
 
   const vec3 t1 = (v.z < 0.99999f) ? normalize(cross(v, vec3(0.0f, 0.0f, 1.0f))) : vec3(1.0f, 0.0f, 0.0f);
   const vec3 t2 = cross(t1, v);
@@ -109,25 +110,22 @@ vec3 hvd_ggx_sample_vndf(vec3 k, vec2 roughness, vec2 xi)
 
   vec3 h = p1 * t1 + p2 * t2 + sqrt(max(0.0f, 1.0f - p1 * p1 - p2 * p2)) * v;
 
-  h.x *= roughness.x;
-  h.y *= roughness.y;
+  h.xy *= roughness;
   h.z = max(0.0f, h.z);
   return normalize(h);
 }
 
 // Smith-masking for anisotropic GGX.
-float smith_shadow_mask(const vec3 k, const vec2 roughness)
+float smith_shadow_mask(vec3 k, const vec2 roughness)
 {
   float kz2 = k.z * k.z;
-  if(kz2 == 0.0f)
+  if(kz2 < NEARzero)
   {
     return 0.0f;  // Totally shadowed
   }
-  const float ax     = k.x * roughness.x;
-  const float ay     = k.y * roughness.y;
-  const float inv_a2 = (ax * ax + ay * ay) / kz2;
 
-  return 2.0f / (1.0f + sqrt(1.0f + inv_a2));
+  k.xy *= roughness;
+  return 2.0f / (1.0f + sqrt(1.0f + dot(k.xy, k.xy) / kz2));
 }
 
 
@@ -222,7 +220,7 @@ vec3 thin_film_factor(float coating_thickness, const float coating_ior, const fl
   vec2       phi12_sin, phi12_cos;
   const vec2 R12 = fresnel_conductor(phi12_sin, phi12_cos, coating_ior, base_ior, /* base_k = */ 0.0f, cos1, sin1_sqr);
 
-  const float tmp = (4.0f * M_PI) * coating_ior * coating_thickness * cos1;
+  const float tmp = (M_TWO_PI + M_TWO_PI) * coating_ior * coating_thickness * cos1;
 
   const float R01R12_s = max(0.0f, R01.x * R12.x);
   const float r01r12_s = sqrt(R01R12_s);
@@ -333,12 +331,14 @@ float ior_fresnel(const float eta,  // refracted / reflected ior
 
   costheta = sqrt(costheta);  // refracted angle cosine
 
-  const float n1t1 = kh;
-  const float n1t2 = costheta;
+  #define n1t1 (kh)
+  #define n1t2 (costheta)
   const float n2t1 = kh * eta;
   const float n2t2 = costheta * eta;
   const float r_p  = (n1t2 - n2t1) / (n1t2 + n2t1);
   const float r_o  = (n1t1 - n2t2) / (n1t1 + n2t2);
+  #undef n1t2
+  #undef n1t1
 
   const float fres = 0.5f * (r_p * r_p + r_o * r_o);
 
@@ -378,16 +378,12 @@ float vcavities_shadow_mask(OUT_TYPE(float) G1, OUT_TYPE(float) G2, const float 
 // Sample half-vector according to anisotropic sheen distribution.
 vec3 hvd_sheen_sample(const vec2 xi, const float invRoughness)
 {
-  const float phi = 2.0f * M_PI * xi.x;
-
-  float sinPhi = sin(phi);
-  float cosPhi = cos(phi);
+  const float phi = M_TWO_PI * xi.x;
 
   const float sinTheta = pow(1.0f - xi.y, 1.0f / (invRoughness + 2.0f));
-  const float cosTheta = sqrt(1.0f - sinTheta * sinTheta);
 
-  return normalize(vec3(cosPhi * sinTheta, sinPhi * sinTheta,
-                        cosTheta));  // In my renderer the z-coordinate is the normal!
+  return normalize(vec3(vec2(cos(phi), sin(phi)) * sinTheta,
+                        sqrt(1.0f - sinTheta * sinTheta)));  // In my renderer the z-coordinate is the normal!
 }
 
 vec3 flip(const vec3 h, const vec3 k, float xi)
