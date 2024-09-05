@@ -34,6 +34,29 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "timesampler.hpp"
 
+// List of supported extensions
+static const std::set<std::string> supportedExtensions = {
+    "KHR_lights_punctual",
+    "KHR_materials_anisotropy",
+    "KHR_materials_clearcoat",
+    "KHR_materials_displacement",
+    "KHR_materials_emissive_strength",
+    "KHR_materials_ior",
+    "KHR_materials_iridescence",
+    "KHR_materials_sheen",
+    "KHR_materials_specular",
+    "KHR_materials_transmission",
+    "KHR_materials_unlit",
+    "KHR_materials_variants",
+    "KHR_materials_volume",
+    "KHR_texture_transform",
+    "EXT_mesh_gpu_instancing",
+    "NV_attributes_iray",
+#ifdef USE_DRACO
+    "KHR_draco_mesh_compression",
+#endif
+};
+
 // Given only a normal vector, finds a valid tangent.
 //
 // This uses the technique from "Improved accuracy when building an orthonormal
@@ -91,6 +114,26 @@ bool nvh::gltf::Scene::load(const std::string& filename)
     return result;
   }
 
+  // Check for required extensions
+  for(auto& extension : m_model.extensionsRequired)
+  {
+    if(supportedExtensions.find(extension) == supportedExtensions.end())
+    {
+      LOGE("Required extension unsupported : %s\n", extension.c_str());
+      clearParsedData();
+      return false;
+    }
+  }
+
+  // Check for used extensions
+  for(auto& extension : m_model.extensionsUsed)
+  {
+    if(supportedExtensions.find(extension) == supportedExtensions.end())
+    {
+      LOGW("Used extension unsupported : %s\n", extension.c_str());
+    }
+  }
+
   m_currentScene   = m_model.defaultScene > -1 ? m_model.defaultScene : 0;
   m_currentVariant = 0;  // Default KHR_materials_variants
   parseScene();
@@ -108,20 +151,25 @@ bool nvh::gltf::Scene::save(const std::string& filename)
 
   // Make sure the extension is correct
   std::string ext = fs::path(filename).extension().string();
-  if(ext != ".gltf")
+  if(ext != ".gltf" && ext != ".glb")
   {
     // replace the extension
     saveFilename = fs::path(filename).replace_extension(".gltf").string();
+    ext          = ".gltf";
   }
 
+  bool saveBinary = ext == ".glb" ? true : false;
+
   // Copy the images to the destination folder
-  if(!m_model.images.empty())
+  if(!m_model.images.empty() && !saveBinary)
   {
     fs::path srcPath   = fs::path(m_filename).parent_path();
     fs::path dstPath   = fs::path(filename).parent_path();
     int      numCopied = 0;
     for(auto& image : m_model.images)
     {
+      if(image.uri.empty())
+        continue;
       std::string uri_decoded;
       tinygltf::URIDecode(image.uri, &uri_decoded, nullptr);  // ex. whitespace may be represented as %20
 
@@ -142,7 +190,7 @@ bool nvh::gltf::Scene::save(const std::string& filename)
 
   // Save the glTF file
   tinygltf::TinyGLTF tcontext;
-  bool               result = tcontext.WriteGltfSceneToFile(&m_model, saveFilename, false, false, true, false);
+  bool result = tcontext.WriteGltfSceneToFile(&m_model, saveFilename, saveBinary, saveBinary, true, saveBinary);
   LOGI("%sSaved: %s\n", st.indent().c_str(), saveFilename.c_str());
   return result;
 }

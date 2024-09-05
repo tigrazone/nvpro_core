@@ -61,6 +61,8 @@ struct PbrMaterial
   float sheenRoughness;
 
   mat3 TBN;
+  float clearcoatRoughness0;
+  float roughness0;
 };
 
 PbrMaterial defaultPbrMaterial()

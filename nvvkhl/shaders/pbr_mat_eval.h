@@ -95,6 +95,7 @@ PbrMaterial evaluateMaterial(in GltfShadeMaterial material, MeshState mesh)
     roughness *= mr_sample.g;
     metallic *= mr_sample.b;
   }
+  pbrMat.roughness0= roughness;
   //roughness        = max(roughness, MICROFACET_MIN_ROUGHNESS);
   pbrMat.roughness = vec2(roughness * roughness);  // Square roughness for the microfacet model
   pbrMat.metallic  = clamp(metallic, 0.0F, 1.0F);
@@ -107,9 +108,8 @@ PbrMaterial evaluateMaterial(in GltfShadeMaterial material, MeshState mesh)
   {
     mat3 tbn           = mat3(mesh.T, mesh.B, mesh.N);
     vec3 normal_vector = getTexture(material.normalTexture, texCoord).xyz;
-    normal_vector      = normal_vector * 2.0F - 1.0F;
-    normal_vector *= vec3(material.normalTextureScale, material.normalTextureScale, 1.0F);
-    normal = normalize(tbn * normal_vector);
+    normal_vector     += normal_vector - 1.0F;
+    normal = normalize(tbn * (normal_vector * vec3(material.normalTextureScale, material.normalTextureScale, 1.0F)));
   }
   // We should always have B = cross(N, T) * bitangentSign. Orthonormalize,
   // in case the normal was changed or the input wasn't orthonormal:
@@ -180,14 +180,14 @@ PbrMaterial evaluateMaterial(in GltfShadeMaterial material, MeshState mesh)
   {
     pbrMat.clearcoatRoughness *= getTexture(material.clearcoatRoughnessTexture, texCoord).g;
   }
+  pbrMat.clearcoatRoughness0= pbrMat.clearcoatRoughness;
   pbrMat.clearcoatRoughness = max(pbrMat.clearcoatRoughness, 0.001F);
 
   if(material.clearcoatNormalTexture > -1)
   {
     mat3 tbn           = mat3(pbrMat.T, pbrMat.B, pbrMat.Nc);
     vec3 normal_vector = getTexture(material.clearcoatNormalTexture, texCoord).xyz;
-    normal_vector      = normal_vector * 2.0F - 1.0F;
-    pbrMat.Nc          = normalize(tbn * normal_vector);
+    pbrMat.Nc          = normalize(tbn * (normal_vector + normal_vector - 1.0F));
   }
 
   // Iridescence
@@ -224,6 +224,7 @@ PbrMaterial evaluateMaterial(in GltfShadeMaterial material, MeshState mesh)
   if(anisotropyStrength > 0.0F)
   {
     pbrMat.roughness.x = mix(pbrMat.roughness.y, 1.0f, anisotropyStrength * anisotropyStrength);
+    pbrMat.roughness0 = -1.f;
 
     const float s = sin(material.anisotropyRotation);  // FIXME PERF Precalculate sin, cos on host.
     const float c = cos(material.anisotropyRotation);
