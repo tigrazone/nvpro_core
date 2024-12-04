@@ -45,7 +45,7 @@ layout(buffer_reference, scalar) readonly buffer VertexPosition     { vec3 _[]; 
 layout(buffer_reference, scalar) readonly buffer VertexNormal       { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord0    { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord1    { uint _[]; };
-layout(buffer_reference, scalar) readonly buffer VertexTangent      { vec4 _[]; };
+layout(buffer_reference, scalar) readonly buffer VertexTangent      { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexColor        { uint _[]; };
 // clang-format on
 
@@ -103,7 +103,8 @@ vec2 getVertexTexCoord0(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTexCoord0(renderPrim))
     return vec2(0, 0);
-  return vec2(unpackFloat2x16(VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address)._[idx]));
+  vec2 uv = vec2(unpackFloat2x16(VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address)._[idx]));
+  return vec2(abs(uv.x), uv.y);
 }
 
 vec2 getInterpolatedVertexTexCoord0(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -112,9 +113,9 @@ vec2 getInterpolatedVertexTexCoord0(RenderPrimitive renderPrim, uvec3 idx, vec3 
     return vec2(0, 0);
   VertexTexCoord0 texcoords = VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address);
   vec2            uv[3];
-  uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x]));
-  uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y]));
-  uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z]));
+  uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x])); uv[0].x = abs(uv[0].x);
+  uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y])); uv[1].x = abs(uv[1].x);
+  uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z])); uv[2].x = abs(uv[2].x);
   return uv[0] * barycentrics.x + uv[1] * barycentrics.y + uv[2] * barycentrics.z;
 }
 
@@ -127,7 +128,8 @@ vec2 getVertexTexCoord1(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTexCoord1(renderPrim))
     return vec2(0, 0);
-  return vec2(unpackFloat2x16(VertexTexCoord1(renderPrim.vertexBuffer.texCoord1Address)._[idx]));
+  vec2 uv = vec2(unpackFloat2x16(VertexTexCoord1(renderPrim.vertexBuffer.texCoord0Address)._[idx]));
+  return vec2(abs(uv.x), uv.y);
 }
 
 vec2 getInterpolatedVertexTexCoord1(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -136,9 +138,9 @@ vec2 getInterpolatedVertexTexCoord1(RenderPrimitive renderPrim, uvec3 idx, vec3 
     return vec2(0, 0);
   VertexTexCoord1 texcoords = VertexTexCoord1(renderPrim.vertexBuffer.texCoord1Address);
   vec2            uv[3];
-  uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x]));
-  uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y]));
-  uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z]));
+  uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x])); uv[0].x = abs(uv[0].x);
+  uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y])); uv[1].x = abs(uv[1].x);
+  uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z])); uv[2].x = abs(uv[2].x);
   return uv[0] * barycentrics.x + uv[1] * barycentrics.y + uv[2] * barycentrics.z;
 }
 
@@ -152,7 +154,13 @@ vec4 getVertexTangent(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTangent(renderPrim))
     return vec4(1, 0, 0, 1);
-  return VertexTangent(renderPrim.vertexBuffer.tangentAddress)._[idx];
+
+  vec4 vt = vec4(decompress_unit_vec(VertexTangent(renderPrim.vertexBuffer.tangentAddress)._[idx]), 1.0f);
+  if(hasVertexTexCoord0(renderPrim)) {
+    vec2 uv = vec2(unpackFloat2x16(VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address)._[idx]));
+    if(uv.x < 0) vt.w = -1.0f;
+  }
+  return vt;
 }
 
 vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -160,11 +168,10 @@ vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 ba
   if(!hasVertexTangent(renderPrim))
     return vec4(1, 0, 0, 1);
 
-  VertexTangent tangents = VertexTangent(renderPrim.vertexBuffer.tangentAddress);
   vec4          tng[3];
-  tng[0] = tangents._[idx.x];
-  tng[1] = tangents._[idx.y];
-  tng[2] = tangents._[idx.z];
+  tng[0] = getVertexTangent(renderPrim, idx.x);
+  tng[1] = getVertexTangent(renderPrim, idx.y);
+  tng[2] = getVertexTangent(renderPrim, idx.z);
   return tng[0] * barycentrics.x + tng[1] * barycentrics.y + tng[2] * barycentrics.z;
 }
 

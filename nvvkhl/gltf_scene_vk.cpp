@@ -490,7 +490,7 @@ void nvvkhl::SceneVk::createVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
     //createAttributeBuffer<glm::vec3>(cmd, "NORMAL", model, primitive, m_alloc, usageFlag, vertexBuffers.normal);
     //createAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_0", model, primitive, m_alloc, usageFlag, vertexBuffers.texCoord0);
     //createAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_1", model, primitive, m_alloc, usageFlag, vertexBuffers.texCoord1);
-    createAttributeBuffer<glm::vec4>(cmd, "TANGENT", model, primitive, m_alloc, usageFlag, vertexBuffers.tangent);
+    //createAttributeBuffer<glm::vec4>(cmd, "TANGENT", model, primitive, m_alloc, usageFlag, vertexBuffers.tangent);
 
     if(tinygltf::utils::hasElementName(primitive.attributes, "NORMAL"))
     {
@@ -514,6 +514,30 @@ void nvvkhl::SceneVk::createVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
       vertexBuffers.normal = m_alloc->createBuffer(cmd, tempIntData, usageFlag);
     }
 
+    
+    std::vector<glm::vec4> tempDataTANGENT;
+
+    if(tinygltf::utils::hasElementName(primitive.attributes, "TANGENT"))
+    {
+      // For color, we need to pack it into a single int
+      const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TANGENT")];
+      std::vector<uint32_t>     tempIntData(accessor.count);
+      if(accessor.type == TINYGLTF_TYPE_VEC4)
+      {
+        tinygltf::utils::getAccessorData(model, accessor, tempDataTANGENT);
+        for(size_t i = 0; i < accessor.count; i++)
+        {
+          tempIntData[i] = compress_unit_vec(glm::normalize(glm::vec3(tempDataTANGENT[i].x, tempDataTANGENT[i].y, tempDataTANGENT[i].z)));
+        }
+      }
+      else
+      {
+        assert(!"Unknown TANGENT type");
+      }
+
+      vertexBuffers.tangent = m_alloc->createBuffer(cmd, tempIntData, usageFlag);
+    }
+
     if(tinygltf::utils::hasElementName(primitive.attributes, "TEXCOORD_0"))
     {
       // For color, we need to pack it into a single int
@@ -525,6 +549,9 @@ void nvvkhl::SceneVk::createVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
         tinygltf::utils::getAccessorData(model, accessor, tempData);
         for(size_t i = 0; i < accessor.count; i++)
         {
+          if(tempDataTANGENT.size() >= i) {
+            if(tempDataTANGENT[i].w < 0) tempData[i].x = -tempData[i].x;
+          }
           tempIntData[i] = glm::packHalf2x16(tempData[i]);
         }
       }
@@ -720,6 +747,28 @@ void nvvkhl::SceneVk::updateVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
         alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
       }
     }
+    
+
+    //updateAttributeBuffer<glm::vec4>("TANGENT", model, primitive, cmd, m_alloc, vertexBuffers.tangent);
+    attributeName = "TANGENT";
+    attributeBuffer = vertexBuffers.tangent;
+
+    std::vector<glm::vec4> tempDataTANGENT;
+
+    if(primitive.attributes.find(attributeName) != primitive.attributes.end())
+    {
+      const tinygltf::Accessor&   accessor = model.accessors[primitive.attributes.at(attributeName)];
+      const tinygltf::BufferView& view     = model.bufferViews[accessor.bufferView];
+
+        // Get accessor data will make a copy of the data, the way we need it
+          std::vector<uint32_t>     tempIntData(accessor.count);
+          tinygltf::utils::getAccessorData(model, accessor, tempDataTANGENT);
+          for(size_t i = 0; i < accessor.count; i++)
+          {
+            tempIntData[i] = compress_unit_vec(glm::normalize(glm::vec3(tempDataTANGENT[i].x, tempDataTANGENT[i].y, tempDataTANGENT[i].z)));
+          }
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
+    }
 
     //updateAttributeBuffer<glm::vec2>("TEXCOORD_0", model, primitive, cmd, m_alloc, vertexBuffers.texCoord0);
     attributeName = "TEXCOORD_0";
@@ -735,16 +784,30 @@ void nvvkhl::SceneVk::updateVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
       {
         const float* bufferData =
             reinterpret_cast<const float*>(&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
-        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, bufferData);
+        std::vector<uint32_t> tempIntData(accessor.count);
+        glm::vec2 tempData;
+        for(size_t i = 0; i < accessor.count; i++)
+        {
+            tempData.x = bufferData[i*2];            
+            tempData.y = bufferData[i*2 + 1];
+            if(tempDataTANGENT.size() >= i) {
+              if(tempDataTANGENT[i].w < 0) tempData.x = -tempData.x;
+            }
+            tempIntData[i] = glm::packHalf2x16(tempData);
+        }
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
       }
       else
       {
         // Get accessor data will make a copy of the data, the way we need it
-          std::vector<uint32_t>     tempIntData(accessor.count);
+          std::vector<uint32_t>  tempIntData(accessor.count);
           std::vector<glm::vec2> tempData;
           tinygltf::utils::getAccessorData(model, accessor, tempData);
           for(size_t i = 0; i < accessor.count; i++)
           {
+            if(tempDataTANGENT.size() >= i) {
+              if(tempDataTANGENT[i].w < 0) tempData[i].x = -tempData[i].x;
+            }
             tempIntData[i] = glm::packHalf2x16(tempData[i]);
           }
         alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
@@ -782,8 +845,6 @@ void nvvkhl::SceneVk::updateVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
     }
 
     #undef T
-
-    updateAttributeBuffer<glm::vec4>("TANGENT", model, primitive, cmd, m_alloc, vertexBuffers.tangent);
   }
 }
 
