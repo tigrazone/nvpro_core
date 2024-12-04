@@ -41,7 +41,7 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "_cmake")
 set(OpenGL_GL_PREFERENCE GLVND)
 
 set(SUPPORT_NVTOOLSEXT OFF CACHE BOOL "enable NVToolsExt for custom NSIGHT markers")
-set(NSIGHT_AFTERMATH_SDK "" CACHE PATH "Point to top directory of nSight Aftermath SDK")
+set(NSIGHT_AFTERMATH_SDK "C:\\inst\\NVIDIA_Nsight_Aftermath_SDK_2024.3.0.24312" CACHE PATH "Point to top directory of nSight Aftermath SDK")
 
 # We use the presence of NSIGHT_AFTERMATH_SDK as enable-switch for Aftermath
 if (NOT NSIGHT_AFTERMATH_SDK)

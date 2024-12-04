@@ -30,6 +30,7 @@ functions for all attributes.
 #define VERTEX_ACCESSOR_H
 
 #include "nvvkhl/shaders/dh_scn_desc.h"
+#include "nvvkhl/shaders/compress.h"
 
 
 // clang-format off
@@ -37,7 +38,7 @@ layout(buffer_reference, scalar) readonly buffer RenderNodeBuf      { RenderNode
 layout(buffer_reference, scalar) readonly buffer RenderPrimitiveBuf { RenderPrimitive _[]; };
 layout(buffer_reference, scalar) readonly buffer TriangleIndices    { uvec3 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexPosition     { vec3 _[]; };
-layout(buffer_reference, scalar) readonly buffer VertexNormal       { vec3 _[]; };
+layout(buffer_reference, scalar) readonly buffer VertexNormal       { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord0    { vec2 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord1    { vec2 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTangent      { vec4 _[]; };
@@ -74,7 +75,7 @@ vec3 getVertexNormal(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexNormal(renderPrim))
     return vec3(0, 0, 1);
-  return VertexNormal(renderPrim.vertexBuffer.normalAddress)._[idx];
+  return decompress_unit_vec(VertexNormal(renderPrim.vertexBuffer.normalAddress)._[idx]);
 }
 
 vec3 getInterpolatedVertexNormal(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -83,9 +84,9 @@ vec3 getInterpolatedVertexNormal(RenderPrimitive renderPrim, uvec3 idx, vec3 bar
     return vec3(0, 0, 1);
   VertexNormal normals = VertexNormal(renderPrim.vertexBuffer.normalAddress);
   vec3         nrm[3];
-  nrm[0] = normals._[idx.x];
-  nrm[1] = normals._[idx.y];
-  nrm[2] = normals._[idx.z];
+  nrm[0] = decompress_unit_vec(normals._[idx.x]);
+  nrm[1] = decompress_unit_vec(normals._[idx.y]);
+  nrm[2] = decompress_unit_vec(normals._[idx.z]);
   return nrm[0] * barycentrics.x + nrm[1] * barycentrics.y + nrm[2] * barycentrics.z;
 }
 
