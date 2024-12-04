@@ -31,7 +31,11 @@ functions for all attributes.
 
 #include "nvvkhl/shaders/dh_scn_desc.h"
 #include "nvvkhl/shaders/compress.h"
-
+  
+#extension GL_AMD_gpu_shader_half_float : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
 
 // clang-format off
 layout(buffer_reference, scalar) readonly buffer RenderNodeBuf      { RenderNode _[]; };
@@ -39,8 +43,8 @@ layout(buffer_reference, scalar) readonly buffer RenderPrimitiveBuf { RenderPrim
 layout(buffer_reference, scalar) readonly buffer TriangleIndices    { uvec3 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexPosition     { vec3 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexNormal       { uint _[]; };
-layout(buffer_reference, scalar) readonly buffer VertexTexCoord0    { vec2 _[]; };
-layout(buffer_reference, scalar) readonly buffer VertexTexCoord1    { vec2 _[]; };
+layout(buffer_reference, scalar) readonly buffer VertexTexCoord0    { uint _[]; };
+layout(buffer_reference, scalar) readonly buffer VertexTexCoord1    { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTangent      { vec4 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexColor        { uint _[]; };
 // clang-format on
@@ -99,7 +103,7 @@ vec2 getVertexTexCoord0(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTexCoord0(renderPrim))
     return vec2(0, 0);
-  return VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address)._[idx];
+  return vec2(unpackFloat2x16(VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address)._[idx]));
 }
 
 vec2 getInterpolatedVertexTexCoord0(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -108,9 +112,9 @@ vec2 getInterpolatedVertexTexCoord0(RenderPrimitive renderPrim, uvec3 idx, vec3 
     return vec2(0, 0);
   VertexTexCoord0 texcoords = VertexTexCoord0(renderPrim.vertexBuffer.texCoord0Address);
   vec2            uv[3];
-  uv[0] = texcoords._[idx.x];
-  uv[1] = texcoords._[idx.y];
-  uv[2] = texcoords._[idx.z];
+  uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x]));
+  uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y]));
+  uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z]));
   return uv[0] * barycentrics.x + uv[1] * barycentrics.y + uv[2] * barycentrics.z;
 }
 
@@ -123,7 +127,7 @@ vec2 getVertexTexCoord1(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTexCoord1(renderPrim))
     return vec2(0, 0);
-  return VertexTexCoord1(renderPrim.vertexBuffer.texCoord1Address)._[idx];
+  return vec2(unpackFloat2x16(VertexTexCoord1(renderPrim.vertexBuffer.texCoord1Address)._[idx]));
 }
 
 vec2 getInterpolatedVertexTexCoord1(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -132,9 +136,9 @@ vec2 getInterpolatedVertexTexCoord1(RenderPrimitive renderPrim, uvec3 idx, vec3 
     return vec2(0, 0);
   VertexTexCoord1 texcoords = VertexTexCoord1(renderPrim.vertexBuffer.texCoord1Address);
   vec2            uv[3];
-  uv[0] = texcoords._[idx.x];
-  uv[1] = texcoords._[idx.y];
-  uv[2] = texcoords._[idx.z];
+  uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x]));
+  uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y]));
+  uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z]));
   return uv[0] * barycentrics.x + uv[1] * barycentrics.y + uv[2] * barycentrics.z;
 }
 
