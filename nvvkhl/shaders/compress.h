@@ -142,7 +142,12 @@ vec3 decompress_unit_vec(uint packed)
 //tangent packing / unpacking
 INLINE uint packTangent(vec4 t)
 {
-  uvec3 u = uvec3(vec3(t.x, t.y, t.z) * 511.0f + 511.0f);
+  vec3 t3 = normalize(vec3(t.x, t.y, t.z));
+  uvec3 u = uvec3(
+    uint(round(clamp(t3.x * 511.0, -511.0, 511.0) + 512.0)),
+    uint(round(clamp(t3.y * 511.0, -511.0, 511.0) + 512.0)),
+    uint(round(clamp(t3.z * 511.0, -511.0, 511.0) + 512.0))
+  );
   return ( t.w < 0.0f ? (1 << 31) : 0 ) | (u.z << 20) | (u.y << 10) | (u.x);
 }
 
@@ -150,8 +155,8 @@ INLINE uint packTangent(vec4 t)
 INLINE vec4 unpackTangent(uint pkd)
 {  
   vec3 t = (vec3(
-                (uvec3(pkd) << uvec3(20, 10, 0)) | ~1023)
-                 - 511.0f
+                (uvec3(pkd) << uvec3(20, 10, 0)) | ~(1023))
+                 - 512.0f
            ) / 511.0f;
   return vec4(t, (pkd & uint(1 << 31)) == 0 ? 1.0f : -1.0f);
 }
