@@ -140,6 +140,11 @@ vec3 decompress_unit_vec(uint packed)
 }
 
 //tangent packing / unpacking
+INLINE uvec2 packTangentPrecise(vec4 t)
+{
+  return uvec2(packHalf2x16(vec2(t.x, t.y)), packHalf2x16(vec2(t.z, t.w)));
+}
+
 INLINE uint packTangent(vec4 t)
 {
   vec3 t3 = normalize(vec3(t.x, t.y, t.z));
@@ -159,6 +164,14 @@ INLINE vec4 unpackTangent(uint pkd)
                  - 512.0f
            ) / 511.0f;
   return vec4(t, (pkd & uint(1 << 31)) == 0 ? 1.0f : -1.0f);
+}
+
+INLINE vec4 unpackTangentPrecise(uvec2 pkd)
+{
+  return vec4(
+    vec2(unpackFloat2x16(pkd[0])),
+    vec2(unpackFloat2x16(pkd[1]))
+    );
 }
 #endif
 

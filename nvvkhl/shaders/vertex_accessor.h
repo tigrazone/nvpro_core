@@ -28,14 +28,14 @@ functions for all attributes.
 
 #ifndef VERTEX_ACCESSOR_H
 #define VERTEX_ACCESSOR_H
-
-#include "nvvkhl/shaders/dh_scn_desc.h"
-#include "nvvkhl/shaders/compress.h"
   
 #extension GL_AMD_gpu_shader_half_float : require
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 #extension GL_EXT_shader_16bit_storage : require
 #extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+
+#include "nvvkhl/shaders/dh_scn_desc.h"
+#include "nvvkhl/shaders/compress.h"
 
 // clang-format off
 layout(buffer_reference, scalar) readonly buffer RenderNodeBuf      { RenderNode _[]; };
@@ -45,7 +45,7 @@ layout(buffer_reference, scalar) readonly buffer VertexPosition     { vec3 _[]; 
 layout(buffer_reference, scalar) readonly buffer VertexNormal       { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord0    { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord1    { uint _[]; };
-layout(buffer_reference, scalar) readonly buffer VertexTangent      { uint _[]; };
+layout(buffer_reference, scalar) readonly buffer VertexTangent      { uvec2 _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexColor        { uint _[]; };
 // clang-format on
 
@@ -152,7 +152,7 @@ vec4 getVertexTangent(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTangent(renderPrim))
     return vec4(1, 0, 0, 1);
-  return unpackTangent(VertexTangent(renderPrim.vertexBuffer.tangentAddress)._[idx]);
+  return unpackTangentPrecise(VertexTangent(renderPrim.vertexBuffer.tangentAddress)._[idx]);
 }
 
 vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -162,9 +162,9 @@ vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 ba
 
   VertexTangent tangents = VertexTangent(renderPrim.vertexBuffer.tangentAddress);
   vec4          tng[3];
-  tng[0] = unpackTangent(tangents._[idx.x]);
-  tng[1] = unpackTangent(tangents._[idx.y]);
-  tng[2] = unpackTangent(tangents._[idx.z]);
+  tng[0] = unpackTangentPrecise(tangents._[idx.x]);
+  tng[1] = unpackTangentPrecise(tangents._[idx.y]);
+  tng[2] = unpackTangentPrecise(tangents._[idx.z]);
   return tng[0] * barycentrics.x + tng[1] * barycentrics.y + tng[2] * barycentrics.z;
 }
 
