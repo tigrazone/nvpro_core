@@ -45,7 +45,7 @@ layout(buffer_reference, scalar) readonly buffer VertexPosition     { vec3 _[]; 
 layout(buffer_reference, scalar) readonly buffer VertexNormal       { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord0    { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexTexCoord1    { uint _[]; };
-layout(buffer_reference, scalar) readonly buffer VertexTangent      { vec4 _[]; };
+layout(buffer_reference, scalar) readonly buffer VertexTangent      { uint _[]; };
 layout(buffer_reference, scalar) readonly buffer VertexColor        { uint _[]; };
 // clang-format on
 
@@ -152,7 +152,7 @@ vec4 getVertexTangent(RenderPrimitive renderPrim, uint idx)
 {
   if(!hasVertexTangent(renderPrim))
     return vec4(1, 0, 0, 1);
-  return VertexTangent(renderPrim.vertexBuffer.tangentAddress)._[idx];
+  return unpackTangent(VertexTangent(renderPrim.vertexBuffer.tangentAddress)._[idx]);
 }
 
 vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 barycentrics)
@@ -162,9 +162,9 @@ vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 ba
 
   VertexTangent tangents = VertexTangent(renderPrim.vertexBuffer.tangentAddress);
   vec4          tng[3];
-  tng[0] = tangents._[idx.x];
-  tng[1] = tangents._[idx.y];
-  tng[2] = tangents._[idx.z];
+  tng[0] = unpackTangent(tangents._[idx.x]);
+  tng[1] = unpackTangent(tangents._[idx.y]);
+  tng[2] = unpackTangent(tangents._[idx.z]);
   return tng[0] * barycentrics.x + tng[1] * barycentrics.y + tng[2] * barycentrics.z;
 }
 

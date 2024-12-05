@@ -139,5 +139,22 @@ vec3 decompress_unit_vec(uint packed)
   }
 }
 
+//tangent packing / unpacking
+INLINE uint packTangent(vec4 t)
+{
+  uvec3 u = uvec3(vec3(t.x, t.y, t.z) * 511.0f + 511.0f);
+  return ( t.w < 0.0f ? (1 << 31) : 0 ) | (u.z << 20) | (u.y << 10) | (u.x);
+}
+
+#ifndef __cplusplus
+INLINE vec4 unpackTangent(uint pkd)
+{  
+  vec3 t = (vec3(
+                (uvec3(pkd) << uvec3(20, 10, 0)) | ~1023)
+                 - 511.0f
+           ) / 511.0f;
+  return vec4(t, (pkd & uint(1 << 31)) == 0 ? 1.0f : -1.0f);
+}
+#endif
 
 #endif  // COMPRESS_GLSL
