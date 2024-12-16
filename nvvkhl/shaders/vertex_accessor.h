@@ -28,7 +28,7 @@ functions for all attributes.
 
 #ifndef VERTEX_ACCESSOR_H
 #define VERTEX_ACCESSOR_H
-  
+
 #extension GL_AMD_gpu_shader_half_float : require
 #extension GL_EXT_shader_explicit_arithmetic_types : require
 #extension GL_EXT_shader_16bit_storage : require
