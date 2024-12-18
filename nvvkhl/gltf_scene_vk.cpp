@@ -37,6 +37,8 @@
 #include "shaders/dh_scn_desc.h"
 #include "shaders/dh_lighting.h"
 
+#include "shaders/compress.h"
+
 //--------------------------------------------------------------------------------------------------
 // Forward declaration
 std::vector<nvvkhl_shaders::Light> getShaderLights(const std::vector<nvh::gltf::RenderLight>& rlights,
@@ -428,10 +430,97 @@ void nvvkhl::SceneVk::createVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
 
     createBlendedPositionBuffer(cmd, model, primitive, mesh, m_alloc, vertexBuffers.position);
 
-    updateAttributeBuffer<glm::vec3>(cmd, "NORMAL", model, primitive, m_alloc, vertexBuffers.normal);
-    updateAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_0", model, primitive, m_alloc, vertexBuffers.texCoord0);
-    updateAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_1", model, primitive, m_alloc, vertexBuffers.texCoord1);
-    updateAttributeBuffer<glm::vec4>(cmd, "TANGENT", model, primitive, m_alloc, vertexBuffers.tangent);
+    // updateAttributeBuffer<glm::vec3>(cmd, "NORMAL", model, primitive, m_alloc, vertexBuffers.normal);
+    if(tinygltf::utils::hasElementName(primitive.attributes, "NORMAL"))
+    {
+      // For color, we need to pack it into a single int
+      const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("NORMAL")];
+      std::vector<uint32_t>     tempIntData(accessor.count);
+      if(accessor.type == TINYGLTF_TYPE_VEC3)
+      {
+        std::vector<glm::vec3> tempData;
+        tinygltf::utils::getAccessorData(model, accessor, tempData);
+        for(size_t i = 0; i < accessor.count; i++)
+        {
+          tempIntData[i] = compress_unit_vec(glm::normalize(tempData[i]));
+        }
+      }
+      else
+      {
+        assert(!"Unknown NORMAL type");
+      }
+
+      vertexBuffers.normal = m_alloc->createBuffer(cmd, tempIntData, s_bufferUsageFlag);
+    }
+
+    // updateAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_0", model, primitive, m_alloc, vertexBuffers.texCoord0);
+    if(tinygltf::utils::hasElementName(primitive.attributes, "TEXCOORD_0"))
+    {
+      // For color, we need to pack it into a single int
+      const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
+      std::vector<uint32_t>     tempIntData(accessor.count);
+      if(accessor.type == TINYGLTF_TYPE_VEC2)
+      {
+        std::vector<glm::vec2> tempData;
+        tinygltf::utils::getAccessorData(model, accessor, tempData);
+        for(size_t i = 0; i < accessor.count; i++)
+        {
+          tempIntData[i] = glm::packHalf2x16(tempData[i]);
+        }
+      }
+      else
+      {
+        assert(!"Unknown TEXCOORD_0 type");
+      }
+
+      vertexBuffers.texCoord0 = m_alloc->createBuffer(cmd, tempIntData, s_bufferUsageFlag);
+    }
+
+    // updateAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_1", model, primitive, m_alloc, vertexBuffers.texCoord1);
+    if(tinygltf::utils::hasElementName(primitive.attributes, "TEXCOORD_1"))
+    {
+      // For color, we need to pack it into a single int
+      const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TEXCOORD_1")];
+      std::vector<uint32_t>     tempIntData(accessor.count);
+      if(accessor.type == TINYGLTF_TYPE_VEC2)
+      {
+        std::vector<glm::vec2> tempData;
+        tinygltf::utils::getAccessorData(model, accessor, tempData);
+        for(size_t i = 0; i < accessor.count; i++)
+        {
+          tempIntData[i] = glm::packHalf2x16(tempData[i]);
+        }
+      }
+      else
+      {
+        assert(!"Unknown TEXCOORD_1 type");
+      }
+
+      vertexBuffers.texCoord1 = m_alloc->createBuffer(cmd, tempIntData, s_bufferUsageFlag);
+    }
+
+    // updateAttributeBuffer<glm::vec4>(cmd, "TANGENT", model, primitive, m_alloc, vertexBuffers.tangent);
+    if(tinygltf::utils::hasElementName(primitive.attributes, "TANGENT"))
+    {
+      // For color, we need to pack it into a single int
+      const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TANGENT")];
+      std::vector<glm::uvec2>     tempIntData(accessor.count);
+      if(accessor.type == TINYGLTF_TYPE_VEC4)
+      {
+        std::vector<glm::vec4> tempData;
+        tinygltf::utils::getAccessorData(model, accessor, tempData);
+        for(size_t i = 0; i < accessor.count; i++)
+        {
+          tempIntData[i] = packTangentPrecise(tempData[i]);
+        }
+      }
+      else
+      {
+        assert(!"Unknown TANGENT type");
+      }
+
+      vertexBuffers.tangent = m_alloc->createBuffer(cmd, tempIntData, s_bufferUsageFlag);
+    }
 
     if(tinygltf::utils::hasElementName(primitive.attributes, "COLOR_0"))
     {
@@ -537,10 +626,138 @@ void nvvkhl::SceneVk::updateVertexBuffers(VkCommandBuffer cmd, const nvh::gltf::
     VertexBuffers&             vertexBuffers = m_vertexBuffers[primID];
     bool                       newBuffer     = false;
     updateAttributeBuffer<glm::vec3>(cmd, "POSITION", model, primitive, m_alloc, vertexBuffers.position);
-    newBuffer |= updateAttributeBuffer<glm::vec3>(cmd, "NORMAL", model, primitive, m_alloc, vertexBuffers.normal);
-    newBuffer |= updateAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_0", model, primitive, m_alloc, vertexBuffers.texCoord0);
-    newBuffer |= updateAttributeBuffer<glm::vec2>(cmd, "TEXCOORD_1", model, primitive, m_alloc, vertexBuffers.texCoord1);
-    newBuffer |= updateAttributeBuffer<glm::vec4>(cmd, "TANGENT", model, primitive, m_alloc, vertexBuffers.tangent);
+
+
+    std::string attributeName = "NORMAL";
+    nvvk::ResourceAllocator* alloc = m_alloc;
+    nvvk::Buffer& attributeBuffer = vertexBuffers.normal;
+
+    #define T uint
+
+    if(primitive.attributes.find(attributeName) != primitive.attributes.end())
+    {
+      const tinygltf::Accessor&   accessor = model.accessors[primitive.attributes.at(attributeName)];
+      const tinygltf::BufferView& view     = model.bufferViews[accessor.bufferView];
+
+      // The most common case is that the buffer is directly readable as T
+      if((view.byteStride == 0 || view.byteStride == sizeof(T)) && !accessor.sparse.isSparse)
+      {
+        const float* bufferData =
+            reinterpret_cast<const float*>(&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, bufferData);
+      }
+      else
+      {
+        // Get accessor data will make a copy of the data, the way we need it
+          std::vector<uint32_t>     tempIntData(accessor.count);
+          std::vector<glm::vec3> tempData;
+          tinygltf::utils::getAccessorData(model, accessor, tempData);
+          for(size_t i = 0; i < accessor.count; i++)
+          {
+            tempIntData[i] = compress_unit_vec(glm::normalize(tempData[i]));
+          }
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
+        newBuffer = true;
+      }
+    }
+
+    //updateAttributeBuffer<glm::vec2>("TEXCOORD_0", model, primitive, cmd, m_alloc, vertexBuffers.texCoord0);
+    attributeName = "TEXCOORD_0";
+    attributeBuffer = vertexBuffers.texCoord0;
+
+    if(primitive.attributes.find(attributeName) != primitive.attributes.end())
+    {
+      const tinygltf::Accessor&   accessor = model.accessors[primitive.attributes.at(attributeName)];
+      const tinygltf::BufferView& view     = model.bufferViews[accessor.bufferView];
+
+      // The most common case is that the buffer is directly readable as T
+      if((view.byteStride == 0 || view.byteStride == sizeof(T)) && !accessor.sparse.isSparse)
+      {
+        const float* bufferData =
+            reinterpret_cast<const float*>(&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, bufferData);
+      }
+      else
+      {
+        // Get accessor data will make a copy of the data, the way we need it
+          std::vector<uint32_t>     tempIntData(accessor.count);
+          std::vector<glm::vec2> tempData;
+          tinygltf::utils::getAccessorData(model, accessor, tempData);
+          for(size_t i = 0; i < accessor.count; i++)
+          {
+            tempIntData[i] = glm::packHalf2x16(tempData[i]);
+          }
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
+        newBuffer = true;
+      }
+    }
+
+    //updateAttributeBuffer<glm::vec2>("TEXCOORD_1", model, primitive, cmd, m_alloc, vertexBuffers.texCoord1);
+    attributeName = "TEXCOORD_1";
+    attributeBuffer = vertexBuffers.texCoord1;
+
+    if(primitive.attributes.find(attributeName) != primitive.attributes.end())
+    {
+      const tinygltf::Accessor&   accessor = model.accessors[primitive.attributes.at(attributeName)];
+      const tinygltf::BufferView& view     = model.bufferViews[accessor.bufferView];
+
+      // The most common case is that the buffer is directly readable as T
+      if((view.byteStride == 0 || view.byteStride == sizeof(T)) && !accessor.sparse.isSparse)
+      {
+        const float* bufferData =
+            reinterpret_cast<const float*>(&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, bufferData);
+      }
+      else
+      {
+        // Get accessor data will make a copy of the data, the way we need it
+          std::vector<uint32_t>     tempIntData(accessor.count);
+          std::vector<glm::vec2> tempData;
+          tinygltf::utils::getAccessorData(model, accessor, tempData);
+          for(size_t i = 0; i < accessor.count; i++)
+          {
+            tempIntData[i] = glm::packHalf2x16(tempData[i]);
+          }
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
+        newBuffer = true;
+      }
+    }
+    
+    #undef T
+
+    #define T uvec2
+    //updateAttributeBuffer<glm::vec4>("TANGENT", model, primitive, cmd, m_alloc, vertexBuffers.tangent);
+    attributeName = "TANGENT";
+    attributeBuffer = vertexBuffers.tangent;
+
+    if(primitive.attributes.find(attributeName) != primitive.attributes.end())
+    {
+      const tinygltf::Accessor&   accessor = model.accessors[primitive.attributes.at(attributeName)];
+      const tinygltf::BufferView& view     = model.bufferViews[accessor.bufferView];
+
+      // The most common case is that the buffer is directly readable as T
+      if((view.byteStride == 0 || view.byteStride == sizeof(T)) && !accessor.sparse.isSparse)
+      {
+        const float* bufferData =
+            reinterpret_cast<const float*>(&(model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset]));
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, bufferData);
+      }
+      else
+      {
+        // Get accessor data will make a copy of the data, the way we need it
+          std::vector<glm::uvec2> tempIntData(accessor.count);
+          std::vector<glm::vec4> tempData;
+          tinygltf::utils::getAccessorData(model, accessor, tempData);
+          for(size_t i = 0; i < accessor.count; i++)
+          {
+            tempIntData[i] = packTangentPrecise(tempData[i]);
+          }
+        alloc->getStaging()->cmdToBuffer(cmd, attributeBuffer.buffer, 0, sizeof(T) * accessor.count, tempIntData.data());
+        newBuffer = true;
+      }
+    }
+
+    #undef T
 
     // A buffer was created (most likely tangent buffer), we need to update the RenderPrimitive buffer
     if(newBuffer)
