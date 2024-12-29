@@ -29,13 +29,11 @@ functions for all attributes.
 #ifndef VERTEX_ACCESSOR_H
 #define VERTEX_ACCESSOR_H
 
-#extension GL_AMD_gpu_shader_half_float : require
-#extension GL_EXT_shader_explicit_arithmetic_types : require
-#extension GL_EXT_shader_16bit_storage : require
-#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#include "nvvkhl/shaders/func.h"
 
 #include "nvvkhl/shaders/dh_scn_desc.h"
 #include "nvvkhl/shaders/compress.h"
+
 
 // clang-format off
 layout(buffer_reference, scalar) readonly buffer RenderNodeBuf      { RenderNode _[]; };
@@ -91,7 +89,7 @@ vec3 getInterpolatedVertexNormal(RenderPrimitive renderPrim, uvec3 idx, vec3 bar
   nrm[0] = decompress_unit_vec(normals._[idx.x]);
   nrm[1] = decompress_unit_vec(normals._[idx.y]);
   nrm[2] = decompress_unit_vec(normals._[idx.z]);
-  return nrm[0] * barycentrics.x + nrm[1] * barycentrics.y + nrm[2] * barycentrics.z;
+  return mixBary(nrm[0], nrm[1], nrm[2], barycentrics);
 }
 
 bool hasVertexTexCoord0(RenderPrimitive renderPrim)
@@ -115,7 +113,7 @@ vec2 getInterpolatedVertexTexCoord0(RenderPrimitive renderPrim, uvec3 idx, vec3 
   uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x]));
   uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y]));
   uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z]));
-  return uv[0] * barycentrics.x + uv[1] * barycentrics.y + uv[2] * barycentrics.z;
+  return mixBary(uv[0], uv[1], uv[2], barycentrics);
 }
 
 bool hasVertexTexCoord1(RenderPrimitive renderPrim)
@@ -139,9 +137,16 @@ vec2 getInterpolatedVertexTexCoord1(RenderPrimitive renderPrim, uvec3 idx, vec3 
   uv[0] = vec2(unpackFloat2x16(texcoords._[idx.x]));
   uv[1] = vec2(unpackFloat2x16(texcoords._[idx.y]));
   uv[2] = vec2(unpackFloat2x16(texcoords._[idx.z]));
-  return uv[0] * barycentrics.x + uv[1] * barycentrics.y + uv[2] * barycentrics.z;
+  return mixBary(uv[0], uv[1], uv[2], barycentrics);
 }
 
+vec4 unpackTangentPrecise(uvec2 pkd)
+{
+  return vec4(
+    vec2(unpackFloat2x16(pkd[0])),
+    vec2(unpackFloat2x16(pkd[1]))
+    );
+}
 
 bool hasVertexTangent(RenderPrimitive renderPrim)
 {
@@ -165,7 +170,7 @@ vec4 getInterpolatedVertexTangent(RenderPrimitive renderPrim, uvec3 idx, vec3 ba
   tng[0] = unpackTangentPrecise(tangents._[idx.x]);
   tng[1] = unpackTangentPrecise(tangents._[idx.y]);
   tng[2] = unpackTangentPrecise(tangents._[idx.z]);
-  return tng[0] * barycentrics.x + tng[1] * barycentrics.y + tng[2] * barycentrics.z;
+  return mixBary(tng[0], tng[1], tng[2], barycentrics);
 }
 
 

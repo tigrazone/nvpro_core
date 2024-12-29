@@ -31,7 +31,72 @@
 #ifdef __cplusplus
 #define INLINE inline
 #include <glm/glm.hpp>
+#define STATIC static
 using namespace glm;
+using vec2 = glm::vec2;
+using vec3 = glm::vec3;
+using vec4 = glm::vec4;
+using uint = uint32_t;
+
+#define max(a, b) ((a)>(b) ? (a) : (b))
+#define min(a, b) ((a)<(b) ? (a) : (b))
+
+STATIC float clamp(float a, float b, float c) { return (a)>(b) ? ((a)<(c) ? (a) : (c)) : (b); }
+
+STATIC vec2 clamp(vec2 a, vec2 b, vec2 c) {
+	vec2 xx = a;
+	xx.x = (a.x)>(b.x) ? ((a.x)<(c.x) ? (a.x) : (c.x)) : (b.x);
+	xx.y = (a.y)>(b.y) ? ((a.y)<(c.y) ? (a.y) : (c.y)) : (b.y);
+	return xx;
+}
+
+/*
+#if !defined(uintBitsToFloat)
+INLINE float uintBitsToFloat(uint32_t const& v)
+{
+  union
+  {
+    uint  in;
+    float out;
+  } u;
+
+  u.in = v;
+
+  return u.out;
+};
+#endif
+
+#if !defined(floatBitsToUint)
+INLINE uint32_t floatBitsToUint(float v)
+{
+  union
+  {
+    float in;
+    uint  out;
+  } u;
+
+  u.in = v;
+
+  return u.out;
+};
+#endif
+*/
+
+INLINE uint packUnorm4x8(vec4 const& v)
+{
+  union
+  {
+    unsigned char in[4];
+    uint          out;
+  } u;
+
+  u.in[0] = (unsigned char)std::round(min(max(v.x, 0.0f), 1.0f) * 255.f);
+  u.in[1] = (unsigned char)std::round(min(max(v.y, 0.0f), 1.0f) * 255.f);
+  u.in[2] = (unsigned char)std::round(min(max(v.z, 0.0f), 1.0f) * 255.f);
+  u.in[3] = (unsigned char)std::round(min(max(v.w, 0.0f), 1.0f) * 255.f);
+
+  return u.out;
+}
 
 INLINE float roundEven(float x)
 {
@@ -57,8 +122,19 @@ INLINE float roundEven(float x)
   }
 }
 
+#define F16VEC2 u16vec2
+#define F16VEC3 u16vec3
+#define FLOAT16_T int16_t
 #else
 #define INLINE
+#define STATIC
+#define F16VEC2 f16vec2
+#define F16VEC3 f16vec3
+#define FLOAT16_T float16_t
+#extension GL_AMD_gpu_shader_half_float : require
+#extension GL_EXT_shader_explicit_arithmetic_types : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
 #endif
 
 
@@ -68,7 +144,7 @@ INLINE float roundEven(float x)
 
 //////////////////////////////////////////////////////////////////////////
 #define C_Stack_Max 3.402823466e+38f
-INLINE uint compress_unit_vec(vec3 nv)
+STATIC uint compress_unit_vec(vec3 nv)
 {
   // map to octahedron and then flatten to 2D (see 'Octahedron Environment Maps' by Engelhardt & Dachsbacher)
   if((nv.x < C_Stack_Max) && !isinf(nv.x))
@@ -100,13 +176,13 @@ INLINE uint compress_unit_vec(vec3 nv)
 
 
 ///
-float short_to_floatm11(const int v)  // linearly maps a short 32767-32768 to a float -1-+1 //!! opt.?
+STATIC float short_to_floatm11(const int v)  // linearly maps a short 32767-32768 to a float -1-+1 //!! opt.?
 {
   return (v >= 0) ? (uintBitsToFloat(0x3F800000u | (uint(v) << 8)) - 1.0f) :
                     (uintBitsToFloat((0x80000000u | 0x3F800000u) | (uint(-v) << 8)) + 1.0f);
 }
 
-vec3 decompress_unit_vec(uint packed)
+STATIC vec3 decompress_unit_vec(uint packed)
 {
   if(packed != ~0u)  // sanity check, not needed as isvalid_unit_vec is called earlier
   {
